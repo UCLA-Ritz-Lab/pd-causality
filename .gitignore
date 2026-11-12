@@ -1,0 +1,13 @@
+data/
+results/
+config/config.yaml
+.snakemake/
+tools/
+__pycache__/
+.DS_Store
+._*
+.Rhistory
+.RData
+.Rproj.user/
+.ipynb_checkpoints/
+logs/
