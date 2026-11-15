@@ -1,0 +1,67 @@
+# Copy to config/config.yaml (git-ignored) and edit paths. Paths are relative
+# to the repo root. Nothing here may point inside results/ of another project
+# for writing — data/ is read-only.
+
+pdqtl: data/pdqtl                      # symlink to ../PD-QTLs/results
+out_dir: results/phase1
+
+# ── Exposure datasets (cis-mQTL summary statistics) ──────────────────────────
+# type "meta":   META_MQTL/meta/{group}_meta_results.csv.gz (common-effect IVW)
+# type "cohort": MatrixEQTL cis_mqtls.txt.gz of one cohort
+# n_samples: number of individuals contributing (used for F / Steiger R^2)
+# afreq: cohort-wide PLINK2 .afreq file(s) for the counted (ALT) allele;
+#        meta datasets use the n-weighted mean of their cohorts' frequencies.
+exposures:
+  meta_controls:                       # PRIMARY (controls: first stage not shifted by PD/levodopa)
+    type: meta
+    file: META_MQTL/meta/controls_meta_results.csv.gz
+    cohorts: [peg1_controls, ppmi_controls]
+  meta_cases:                          # sensitivity (post-diagnosis methylation)
+    type: meta
+    file: META_MQTL/meta/cases_meta_results.csv.gz
+    cohorts: [peg1_cases, ppmi_cases]
+  peg1_controls:
+    type: cohort
+    file: PEG_MQTL/mqtl/peg1_controls/cis_mqtls.txt.gz
+    cohorts: [peg1_controls]
+  ppmi_controls:
+    type: cohort
+    file: PPMI_MQTL/mqtl/ppmi_controls/cis_mqtls.txt.gz
+    cohorts: [ppmi_controls]
+
+cohorts:                               # baseline-methylation n; n_cov = covariates in the mQTL model
+                                       # (PEG: sex, age, 6 cell types, 5 PCs; PPMI: age, 5 cell types, 5 PCs)
+  peg1_controls: {n_samples: 231, n_cov: 13, pipeline: PEG_MQTL,  probes: PEG_MQTL/positions/cpg_positions.csv}
+  peg1_cases:    {n_samples: 319, n_cov: 13, pipeline: PEG_MQTL,  probes: PEG_MQTL/positions/cpg_positions.csv}
+  ppmi_controls: {n_samples: 70,  n_cov: 11, pipeline: PPMI_MQTL, probes: PPMI_MQTL/positions/cpg_positions.csv}
+  ppmi_cases:    {n_samples: 216, n_cov: 11, pipeline: PPMI_MQTL, probes: PPMI_MQTL/positions/cpg_positions.csv}
+
+# ── Outcome GWAS (Nalls 2019, GRCh37, no rsIDs: match on chr:pos + alleles) ──
+outcomes:
+  nalls2019:                           # PRIMARY: 15,056 cases + 18,618 proxy cases vs 449,056 controls
+    file: data/external/GWAS_PD/GCST009325/GCST009325.tsv
+    n_cases: 33674
+    n_controls: 449056
+    prevalence: 0.005                  # for liability-scale R^2 in Steiger
+  nalls2019_noproxy:                   # sensitivity: no UKB proxy cases
+    file: data/external/GWAS_PD/GCST009324/GCST009324.tsv.gz
+    n_cases: 15056
+    n_controls: 12637
+    prevalence: 0.005
+
+# ── Instrument selection ────────────────────────────────────────────────────
+instruments:
+  p_threshold: 5.0e-8
+  snp_in_probe_bp: 50                  # drop SNPs within this distance of the CpG
+  palindrome_maf_max: 0.42             # keep A/T, C/G SNPs only if MAF < this (EAF-resolvable)
+  eaf_discordance_max: 0.2             # drop if |EAF_exposure - EAF_gwas| exceeds this after harmonising
+
+# ── LD clumping (per CpG) ───────────────────────────────────────────────────
+clump:
+  ref_prefix: data/pdqtl/ANCESTRY_REF/kgp/chr{chrom}   # 1000G phase 3 GRCh37 (biallelic SNPs, global MAF>=5%)
+  panel: data/pdqtl/ANCESTRY_REF/resources/kgp/panel.txt
+  super_pop: EUR
+  r2: 0.001
+  plink2: plink2
+
+fdr: 0.05

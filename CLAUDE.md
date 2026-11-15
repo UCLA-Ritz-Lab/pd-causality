@@ -71,7 +71,7 @@ Why MR: PD and its treatment (especially levodopa) change blood methylation, so 
   - Imputed genotypes (HRC r1.1, hg19): `PPMI_WGS/post_imputed/ppmi_imputed.{pgen,pvar,psam}` (n=894), `PEG_WGS/post_imputed/peg_imputed.*` (n=1840).
   - PPMI methylation: `PPMI_GCP/local_results/final/beta_matrix.csv.gz` (4.3 GB) + `cell_type_proportions.csv`.
   - cis-mQTLs: `PPMI_MQTL/mqtl/ppmi_{cases,controls}/cis_mqtls.txt.gz`; `PEG_MQTL/mqtl/{peg1_cases,peg1_controls,peg2_cases}/`.
-  - Meta-analysis: `META_MQTL/meta/{cases,controls}_meta_results.csv.gz`, `*_sig_fdr05.csv`. Longitudinal: `PPMI_LONG/`.
+  - Meta-analysis (common-effect IVW, PEG1+PPMI, pairs at p<1e-3 in every cohort, so meta FDR is nearly uninformative): `META_MQTL/meta/{cases,controls}_meta_results.csv.gz`, `*_sig_fdr05.csv`, `*_lead_fdr05.csv` (top |z| pair per CpG); computed by `PD-QTLs/pipelines/META_MQTL/run_meta_mqtl.R`. Longitudinal (lead pairs, PPMI mixed models): `PPMI_LONG/`.
   - Ancestry PCs: `ANCESTRY_REF/covariates/ancestry_pcs_{PPMI,PEG}.csv`.
 - Everything under `data/` is read-only and git-ignored. Write outputs to `results/`, never into the linked trees.
 - PPMI IDs: psam IIDs are `PPMISI<PATNO>`; strip the prefix to join to PPMI clinical CSVs (`PATNO`). Case status: `Participant_Status_*.csv` `COHORT_DEFINITION`.
@@ -96,6 +96,10 @@ Why MR: PD and its treatment (especially levodopa) change blood methylation, so 
 - Restrict SNPs to the cross-cohort intersection before meta-analysis.
 - Harmonise effect alleles and strand between mQTL and GWAS files before any two-sample MR; drop ambiguous palindromic SNPs unless allele frequencies resolve them.
 - Handle OOM case by case if it comes up; don't pre-optimise file formats.
+- **PEG mQTLs before 2026-11-11 are invalid.** `PD-QTLs/pipelines/PEG_MQTL/scripts/run_mqtl.R` loaded genotype columns in file order while methylation/covariates were in `id_map` order, so MatrixEQTL paired different people. It was fixed on 2026-11-11; the allele-coding fix (see below) followed on 2026-11-12, and the PEG mQTLs/metQTLs are re-run after both. `META_MQTL`, `PPMI_LONG` and the mQTL×metQTL overlap report were re-run from the fixed PEG results on 2026-11-14/15 (merged to PD-QTLs `main`); pre-fix outputs are in `PD-QTLs/archive/pre_pegfix_20261114/`. Sanity check for any QTL run: strong known cis-mQTLs should replicate across cohorts.
+- mQTL files key SNPs as `chr:pos` (no alleles); `beta` is on the methylation **beta-value** (0–1) scale; SE = beta / t. `beta` is per **ALT** allele (REF/ALT from the HRC-imputed `.pvar`; counted allele + chosen record per chr:pos in each pipeline's `positions/export_allele.txt`). PEG results from before the 2026-11-12 re-run counted **REF** (plain `plink2 --export Av`; PPMI vs PEG lead pairs had 0% sign concordance, cor(beta) = −0.97) and kept duplicate multiallelic records. PEG_MQTL/PEG_METAB now use PPMI's `--export-allele` + one-record-per-position scheme. Each cohort picks its multiallelic record by its own frequencies, so still match on alleles, not just chr:pos, when combining cohorts or harmonising with a GWAS. Cis p-truncation: PPMI 1e-3, PEG 1e-2.
+- Drop SNP-in-probe artefacts (SNP within 50 bp of the CpG); about 7% of PPMI lead mQTLs.
+- PPMI mQTL covariates: age, 5 cell types, 5 PCs, **no sex**. PEG: sex, age, 6 cell types, 5 PCs. Baseline-methylation sample sizes: PPMI controls 70, cases 216; PEG1 controls 231, PEG1 cases 319, PEG2 cases 209.
 
 ## Commands
 
