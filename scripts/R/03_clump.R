@@ -15,7 +15,7 @@
 #
 # Output: results/phase1/instruments/{exposure}__{outcome}.tsv.gz  (instrument rows,
 #         exposure + outcome effects aligned to ALT), and summary.tsv
-# Usage:  Rscript scripts/R/03_clump.R
+# Usage:  Rscript scripts/R/03_clump.R [combo ...]   (default: every harmonised combo)
 
 source("scripts/R/phase1_lib.R")
 cfg <- load_config()
@@ -26,6 +26,8 @@ dir.create(tmp, showWarnings = FALSE)
 # ── Combos and candidates ────────────────────────────────────────────────────
 hfiles <- list.files(out_path(cfg, "harmonised"), pattern = "__.*\\.tsv\\.gz$", full.names = TRUE)
 combos <- sub("\\.tsv\\.gz$", "", basename(hfiles))
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args)) { stopifnot(all(args %in% combos)); combos <- args }
 cand <- list()
 for (cb in combos) {
   ds <- sub("__.*", "", cb)
@@ -119,5 +121,7 @@ for (cb in combos) {
     no_snp_in_ref = per_cpg[ld_ref == "missing", .N])
 }
 s <- rbindlist(summ)
-fwrite(s, out_path(cfg, "instruments", "summary.tsv"), sep = "\t")
+sf <- out_path(cfg, "instruments", "summary.tsv")
+if (length(args) && file.exists(sf)) s <- rbind(fread(sf)[!combo %in% combos], s)
+fwrite(s, sf, sep = "\t")
 print(s)

@@ -18,11 +18,15 @@
 #
 # Output: results/phase1/harmonised/{exposure}__{outcome}.tsv.gz  (one row per SNP)
 #         results/phase1/harmonised/summary.tsv
-# Usage:  Rscript scripts/R/02_harmonise_outcome.R
+# An outcome may list `exposures:` in the config to restrict pairing (crossed design:
+# in-house GWAS are only paired with the other cohort's mQTLs).
+# Usage:  Rscript scripts/R/02_harmonise_outcome.R [outcome ...]   (default: all)
 
 source("scripts/R/phase1_lib.R")
 cfg <- load_config()
 ic  <- cfg$instruments
+args <- commandArgs(trailingOnly = TRUE)
+outcomes <- if (length(args)) args else names(cfg$outcomes)
 
 exp_files <- list.files(out_path(cfg, "exposure"), pattern = "\\.tsv\\.gz$", full.names = TRUE)
 exp_snps <- lapply(setNames(exp_files, sub("\\.tsv\\.gz$", "", basename(exp_files))), function(f)
@@ -35,7 +39,7 @@ logmsg("exposure datasets: %s; unique SNP positions: %s", paste(names(exp_snps),
 harmonise <- function(x, g) harmonise_gwas(x, g, ic)
 
 summ <- list()
-for (oc in names(cfg$outcomes)) {
+for (oc in outcomes) {
   o <- cfg$outcomes[[oc]]
   logmsg("=== outcome %s: reading %s", oc, o$file)
   g <- read_gwas(o$file)
@@ -45,6 +49,7 @@ for (oc in names(cfg$outcomes)) {
          format(nrow(g), big.mark = ","))
 
   for (ds in names(exp_snps)) {
+    if (!is.null(o$exposures) && !ds %in% unlist(o$exposures)) next
     x <- exp_snps[[ds]]
     stopifnot(!anyDuplicated(x$snp_id))
     m <- harmonise(x, g)
@@ -69,5 +74,7 @@ for (oc in names(cfg$outcomes)) {
   rm(g); gc(verbose = FALSE)
 }
 s <- rbindlist(summ)
-fwrite(s, out_path(cfg, "harmonised", "summary.tsv"), sep = "\t")
+sf <- out_path(cfg, "harmonised", "summary.tsv")
+if (length(args) && file.exists(sf)) s <- rbind(fread(sf)[!outcome %in% outcomes], s)
+fwrite(s, sf, sep = "\t")
 print(s)

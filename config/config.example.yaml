@@ -49,6 +49,27 @@ outcomes:
     n_controls: 12637
     prevalence: 0.005
 
+  # ── In-house GWAS (step 8): crossed design only — never paired with the same cohort's mQTLs.
+  # EUR only; covariates sex, age, ancestry PCs 1-5; PLINK2 logistic (Firth fallback).
+  ppmi_gwas:                           # PPMI PD (incl. genetic-cohort cases) vs HC
+    file: results/phase1/inhouse_gwas/ppmi.tsv.gz
+    n_cases: 487
+    n_controls: 182
+    prevalence: 0.005
+    exposures: [peg1_controls]
+  ppmi_nogen_gwas:                     # PPMI without PD enrolled through LRRK2/GBA/SNCA
+    file: results/phase1/inhouse_gwas/ppmi_nogen.tsv.gz
+    n_cases: 395
+    n_controls: 182
+    prevalence: 0.005
+    exposures: [peg1_controls]
+  peg_gwas:                            # PEG1+PEG2 participants with covariates
+    file: results/phase1/inhouse_gwas/peg.tsv.gz
+    n_cases: 428
+    n_controls: 217
+    prevalence: 0.005
+    exposures: [ppmi_controls]
+
 # ── Instrument selection ────────────────────────────────────────────────────
 instruments:
   p_threshold: 5.0e-8
