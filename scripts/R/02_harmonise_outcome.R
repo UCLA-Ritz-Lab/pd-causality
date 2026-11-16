@@ -32,41 +32,13 @@ all_pos <- unique(rbindlist(exp_snps)[, .(chr, pos)])
 logmsg("exposure datasets: %s; unique SNP positions: %s", paste(names(exp_snps), collapse = ", "),
        format(nrow(all_pos), big.mark = ","))
 
-harmonise <- function(x, g) {
-  # x: exposure SNPs (snp_id, chr, pos, ref, alt, eaf); g: GWAS rows at those positions
-  m <- merge(x, g, by = c("chr", "pos"), allow.cartesian = TRUE)
-  m[, pal := is_palindromic(alt, ref)]
-  m[, match := fcase(
-    ea == alt & oa == ref, "aligned",
-    ea == ref & oa == alt, "swapped",
-    complement(ea) == alt & complement(oa) == ref, "strand_aligned",
-    complement(ea) == ref & complement(oa) == alt, "strand_swapped",
-    default = "mismatch")]
-  m <- m[match != "mismatch"]
-  # prefer the exact allele match if a position has several GWAS rows
-  m[, pri := fifelse(match %in% c("aligned", "swapped"), 1L, 2L)]
-  setorder(m, snp_id, pri)
-  m <- m[!duplicated(snp_id)]
-  m[, sgn := fifelse(match %in% c("aligned", "strand_aligned"), 1, -1)]
-  # palindromic: alleles cannot tell strand; use frequency (assumes both on forward strand
-  # unless frequencies say otherwise)
-  m[pal == TRUE, sgn := fifelse((eaf - 0.5) * (eaf_g - 0.5) > 0, 1, -1)]
-  m[, `:=`(beta_y = sgn * beta_g, eaf_y = fifelse(sgn > 0, eaf_g, 1 - eaf_g))]
-  m[, maf_x := pmin(eaf, 1 - eaf)]
-  m[, drop := fcase(
-    pal & maf_x >= ic$palindrome_maf_max, "palindromic_ambiguous",
-    abs(eaf - eaf_y) > ic$eaf_discordance_max, "eaf_discordant",
-    default = NA_character_)]
-  m
-}
+harmonise <- function(x, g) harmonise_gwas(x, g, ic)
 
 summ <- list()
 for (oc in names(cfg$outcomes)) {
   o <- cfg$outcomes[[oc]]
   logmsg("=== outcome %s: reading %s", oc, o$file)
-  g <- fread(o$file, select = 1:8, colClasses = list(character = "chromosome"))
-  setnames(g, c("chr", "pos", "ea", "oa", "beta_g", "se_y", "eaf_g", "p_y"))
-  g[, `:=`(ea = toupper(ea), oa = toupper(oa), pos = as.integer(pos))]
+  g <- read_gwas(o$file)
   n_gwas <- nrow(g)
   g <- g[all_pos, on = c("chr", "pos"), nomatch = NULL]
   logmsg("  GWAS rows: %s; at exposure positions: %s", format(n_gwas, big.mark = ","),

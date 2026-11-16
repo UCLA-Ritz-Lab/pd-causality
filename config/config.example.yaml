@@ -32,9 +32,9 @@ exposures:
 cohorts:                               # baseline-methylation n; n_cov = covariates in the mQTL model
                                        # (PEG: sex, age, 6 cell types, 5 PCs; PPMI: age, 5 cell types, 5 PCs)
   peg1_controls: {n_samples: 231, n_cov: 13, pipeline: PEG_MQTL,  probes: PEG_MQTL/positions/cpg_positions.csv}
-  peg1_cases:    {n_samples: 319, n_cov: 13, pipeline: PEG_MQTL,  probes: PEG_MQTL/positions/cpg_positions.csv}
-  ppmi_controls: {n_samples: 70,  n_cov: 11, pipeline: PPMI_MQTL, probes: PPMI_MQTL/positions/cpg_positions.csv}
-  ppmi_cases:    {n_samples: 216, n_cov: 11, pipeline: PPMI_MQTL, probes: PPMI_MQTL/positions/cpg_positions.csv}
+  peg1_cases:    {n_samples: 312, n_cov: 13, pipeline: PEG_MQTL,  probes: PEG_MQTL/positions/cpg_positions.csv}
+  ppmi_controls: {n_samples: 69,  n_cov: 11, pipeline: PPMI_MQTL, probes: PPMI_MQTL/positions/cpg_positions.csv}
+  ppmi_cases:    {n_samples: 213, n_cov: 11, pipeline: PPMI_MQTL, probes: PPMI_MQTL/positions/cpg_positions.csv}
 
 # ── Outcome GWAS (Nalls 2019, GRCh37, no rsIDs: match on chr:pos + alleles) ──
 outcomes:

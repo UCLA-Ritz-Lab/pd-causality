@@ -27,6 +27,45 @@ z_for_p <- function(p) qnorm(p / 2, lower.tail = FALSE)
 complement <- function(x) chartr("ACGT", "TGCA", x)
 is_palindromic <- function(a1, a2) a1 == complement(a2)
 
+# Nalls-format GWAS (first 8 columns), alleles uppercased (GCST009324 is lowercase).
+read_gwas <- function(f) {
+  g <- fread(f, select = 1:8, colClasses = list(character = "chromosome"))
+  setnames(g, c("chr", "pos", "ea", "oa", "beta_g", "se_y", "eaf_g", "p_y"))
+  g[, `:=`(ea = toupper(ea), oa = toupper(oa), pos = as.integer(pos))]
+  g
+}
+
+# Align GWAS rows to the exposure's ALT allele.
+# x: exposure SNPs (snp_id, chr, pos, ref, alt, eaf = ALT freq); g: read_gwas() rows.
+# ic: config$instruments (palindrome_maf_max, eaf_discordance_max).
+# Returns one row per matched snp_id with beta_y / eaf_y on the ALT allele and `drop`
+# set (non-NA) for ambiguous palindromes and allele-frequency-discordant SNPs.
+harmonise_gwas <- function(x, g, ic) {
+  m <- merge(x, g, by = c("chr", "pos"), allow.cartesian = TRUE)
+  m[, pal := is_palindromic(alt, ref)]
+  m[, match := fcase(
+    ea == alt & oa == ref, "aligned",
+    ea == ref & oa == alt, "swapped",
+    complement(ea) == alt & complement(oa) == ref, "strand_aligned",
+    complement(ea) == ref & complement(oa) == alt, "strand_swapped",
+    default = "mismatch")]
+  m <- m[match != "mismatch"]
+  # prefer the exact allele match if a position has several GWAS rows
+  m[, pri := fifelse(match %in% c("aligned", "swapped"), 1L, 2L)]
+  setorder(m, snp_id, pri)
+  m <- m[!duplicated(snp_id)]
+  m[, sgn := fifelse(match %in% c("aligned", "strand_aligned"), 1, -1)]
+  # palindromic: alleles cannot tell strand; orient by allele frequency
+  m[pal == TRUE, sgn := fifelse((eaf - 0.5) * (eaf_g - 0.5) > 0, 1, -1)]
+  m[, `:=`(beta_y = sgn * beta_g, eaf_y = fifelse(sgn > 0, eaf_g, 1 - eaf_g))]
+  m[, maf_x := pmin(eaf, 1 - eaf)]
+  m[, drop := fcase(
+    pal & maf_x >= ic$palindrome_maf_max, "palindromic_ambiguous",
+    abs(eaf - eaf_y) > ic$eaf_discordance_max, "eaf_discordant",
+    default = NA_character_)]
+  m
+}
+
 # Long-range LD / pleiotropy-prone regions to flag (GRCh37). Generous windows.
 # MAPT H1/H2 inversion, HLA, GBA1, LRRK2 (CLAUDE.md: treat with special care).
 FLAG_REGIONS <- data.table(
