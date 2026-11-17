@@ -23,20 +23,25 @@
 # Targets: CpGs with FDR < cfg$fdr in results/phase1/mr/meta_controls__nalls2019.tsv.gz.
 # Output: results/phase1/coloc_susie/meta_controls__{outcome}.tsv.gz (one row per CpG, best
 #         credible-set pair) and *_pairs.tsv.gz (all credible-set pairs).
-# Usage:  Rscript scripts/R/07_coloc_susie.R [outcome]   (default nalls2019)
+#         With a second argument (another outcome), the CpGs tested are that outcome's MR hits
+#         and the output is meta_controls__{outcome}_on_{hits_from}*.tsv.gz, e.g. the
+#         no-proxy GWAS run on the primary hit set.
+# Usage:  Rscript scripts/R/07_coloc_susie.R [outcome] [hits_from]   (default nalls2019)
 
 source("scripts/R/phase1_lib.R")
 suppressPackageStartupMessages({ library(coloc); library(susieR) })
 cfg <- load_config()
 args <- commandArgs(trailingOnly = TRUE)
 oc <- if (length(args)) args[1] else "nalls2019"
+hf <- if (length(args) >= 2) args[2] else oc
+tag <- if (hf == oc) oc else sprintf("%s_on_%s", oc, hf)
 o  <- cfg$outcomes[[oc]]
 co <- "peg1_controls"
 cc <- cfg$cohorts[[co]]
 pipe <- cc$pipeline
 set.seed(20261115)
 
-hits <- fread(out_path(cfg, "mr", sprintf("meta_controls__%s.tsv.gz", oc)),
+hits <- fread(out_path(cfg, "mr", sprintf("meta_controls__%s.tsv.gz", hf)),
               colClasses = list(character = "cpg_chr"))[fdr < cfg$fdr]
 reg <- fread(out_path(cfg, "regional_mqtl", paste0(co, ".tsv.gz")),
              colClasses = list(character = c("cpg_id", "snp_id")))[cpg_id %in% hits$cpg_id]
@@ -152,7 +157,8 @@ for (cp in cpgs) {
 }
 
 r <- rbindlist(res)
-abf <- fread(out_path(cfg, "coloc", sprintf("meta_controls__%s.tsv.gz", oc)))[, .(cpg_id, abf_H3 = PP.H3, abf_H4 = PP.H4, abf_call = coloc)]
+abf_f <- out_path(cfg, "coloc", sprintf("meta_controls__%s.tsv.gz", oc))
+abf <- fread(abf_f)[, .(cpg_id, abf_H3 = PP.H3, abf_H4 = PP.H4, abf_call = coloc)]   # only for CpGs that are hits for oc
 r <- merge(hits[, .(cpg_id, cpg_chr, cpg_pos, b, p, fdr, flag_region)], r, by = "cpg_id", all.x = TRUE)
 r <- merge(r, abf, by = "cpg_id", all.x = TRUE)
 r[, susie_call := fcase(is.na(cs_mqtl) | is.na(cs_gwas), "not_run",
@@ -162,7 +168,7 @@ r[, susie_call := fcase(is.na(cs_mqtl) | is.na(cs_gwas), "not_run",
                         best_H3 >= 0.5, "distinct_H3",
                         default = "inconclusive")]
 setorder(r, p)
-fwrite(r, out_path(cfg, "coloc_susie", sprintf("meta_controls__%s.tsv.gz", oc)), sep = "\t")
+fwrite(r, out_path(cfg, "coloc_susie", sprintf("meta_controls__%s.tsv.gz", tag)), sep = "\t")
 if (length(pairs_out)) fwrite(rbindlist(pairs_out, fill = TRUE),
-                              out_path(cfg, "coloc_susie", sprintf("meta_controls__%s_pairs.tsv.gz", oc)), sep = "\t")
+                              out_path(cfg, "coloc_susie", sprintf("meta_controls__%s_pairs.tsv.gz", tag)), sep = "\t")
 print(r[, .N, by = .(abf_call, susie_call)][order(abf_call, susie_call)])

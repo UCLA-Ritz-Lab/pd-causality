@@ -58,7 +58,7 @@ After the fixes and re-runs, lead mQTL signs agree 100% across cohorts. The PEG/
 meta-analysis, the PPMI longitudinal mQTL analysis and the mQTL×metQTL overlap were
 then re-run.
 
-### Phase 1: nominate CpGs by two-sample MR (in progress)
+### Phase 1: nominate CpGs by two-sample MR (done 2026-11-17)
 
 Pipeline in `scripts/R/` (run from the repo root with `conda activate pd-qtl`):
 
@@ -70,7 +70,7 @@ Pipeline in `scripts/R/` (run from the repo root with `conda activate pd-qtl`):
 | 4 | `04_mr.R` | Wald ratio (1 instrument), IVW with multiplicative random effects (≥ 2), weighted median and MR-Egger (≥ 3), Steiger direction check, Benjamini–Hochberg FDR across CpGs |
 | 5 | `05_regional_mqtl.R` | refits **untruncated** regional cis-mQTL statistics (±1 Mb) for the MR hits, for colocalization. Same model as PD-QTLs; reproduces its output to machine precision |
 | 6 | `06_coloc.R` | coloc.abf (single causal variant) per hit CpG; p12 = 5×10⁻⁶ (1×10⁻⁵ as sensitivity) |
-| 7 | `07_coloc_susie.R` | coloc-SuSiE (several causal variants): PEG1-controls mQTL with in-sample LD, GWAS with 1000G EUR LD |
+| 7 | `07_coloc_susie.R` | coloc-SuSiE (several causal variants): PEG1-controls mQTL with in-sample LD, GWAS with 1000G EUR LD; `07_coloc_susie.R nalls2019_noproxy nalls2019` runs the no-proxy GWAS on the primary hits |
 | 8 | `08_inhouse_gwas.R` | in-house PD GWAS (PLINK2 logistic, European ancestry; sex, age, 5 PCs): PPMI 487 vs 182 (395 vs 182 without genetic-cohort cases), PEG 428 vs 217 |
 | 9 | `09_results_table.R` | consolidated table of primary hits: MR, sensitivity, crossed replication, coloc, evidence tier, and the required metadata (sample, timepoint, covariates, instrument strength, IV assumptions) |
 | 10 | `10_mapt.R` | (run before step 9) MAPT H1/H2: instrument LD with the H2 tag (rs8070723), H2-conditional mQTL (exact, in-sample) and GWAS (approximate, 1000G EUR LD), conditional MR and coloc |
@@ -112,6 +112,20 @@ separate signals in LD, so each hit is tiered by coloc:
   even with multi-signal SuSiE.
 - Several tier A/B loci rest on sub-genome-wide PD signals, where SuSiE finds no
   GWAS credible set. They depend on coloc.abf and need replication.
+- Sensitivity, coloc-SuSiE with the no-proxy GWAS (GCST009324) on the same 44 hits.
+  The tiers are not changed by it:
+  - Where the primary run found a shared variant, the no-proxy run agrees: both tier A
+    SuSiE calls stay H4 ≥ 0.9. Of the two tier B SuSiE calls, one stays moderate and
+    the other loses its GWAS credible set.
+  - 18 of the 25 SuSiE-distinct (H3) CpGs stay distinct. 3 lose their GWAS credible
+    set. 1 single-CpG locus moves from H3 0.78 to H4 0.70, which is unstable, so it stays
+    tier C.
+  - The other 2 that move are the tier C partners in the 16p11.2 instrument group. With
+    the no-proxy GWAS they colocalize (H4 0.93) like their tier A partner, because the
+    GWAS credible-set lead moves about 9 kb. That supports treating the group as one
+    nomination.
+  - The tier A/B CpGs that rely on coloc.abf still have no GWAS credible set, as
+    expected with fewer cases.
 
 Crossed replication with in-house GWAS (independent of Nalls). The in-house GWAS have
 fewer than 500 cases, so they test direction, not significance:
@@ -158,14 +172,15 @@ say which CpG (if any) matters:
   - The two MAPT groups are linked through H1/H2 LD (see above).
 - By group, the tiers are: A 5 groups (7 CpGs), B 5 groups (11), C 12 groups (26).
 
-These are **nominations, not causal claims**. Remaining Phase 1 work:
+These are **nominations, not causal claims**. Phase 1 checklist:
 - [x] Colocalization (coloc.abf, coloc-SuSiE).
 - [x] Crossed replication with in-house GWAS.
 - [x] Results table with sample, cohort, methylation timepoint, covariates, instrument
       strength and the IV assumptions relied on (`results/phase1/tables/`).
 - [x] CpGs sharing one instrument (`results/phase1/shared_iv/`, `tables/instrument_groups.tsv`).
 - [x] MAPT H1/H2 handling (`results/phase1/mapt/`).
-- [ ] Coloc-SuSiE for exposures other than PEG1 controls, and for the no-proxy GWAS.
+- [x] Coloc-SuSiE with the no-proxy GWAS (sensitivity). Not run for other exposures:
+      in-sample LD from PPMI controls (n = 69) is too noisy for SuSiE.
 - [ ] Optional, not blocking: a larger PEG GWAS. PD status, sex and age are currently
       available only for the 807 methylation-study participants (760 with ancestry PCs,
       645 European), not for all 1,840 genotyped. Data access was scoped to mQTL

@@ -42,6 +42,11 @@ ab <- rd("coloc", "meta_controls__nalls2019.tsv.gz")[, .(cpg_id, abf_H3 = round(
 su <- rd("coloc_susie", "meta_controls__nalls2019.tsv.gz")[, .(cpg_id, susie_cs_mqtl = cs_mqtl, susie_cs_gwas = cs_gwas,
                                                               susie_H4 = round(best_H4, 3), susie_H3 = round(best_H3, 3), susie_call)]
 out <- merge(merge(out, ab, by = "cpg_id", all.x = TRUE), su, by = "cpg_id", all.x = TRUE)
+# sensitivity (does not change the tier): coloc-SuSiE with the no-proxy GWAS on the same hits
+sn <- rd("coloc_susie", "meta_controls__nalls2019_noproxy_on_nalls2019.tsv.gz")
+if (!is.null(sn)) out <- merge(out, sn[, .(cpg_id, susie_noproxy_cs_gwas = cs_gwas, susie_noproxy_H4 = round(best_H4, 3),
+                                           susie_noproxy_H3 = round(best_H3, 3), susie_noproxy_call = susie_call)],
+                               by = "cpg_id", all.x = TRUE)
 
 # MAPT H1/H2 (step 10): H2-tag LD of the instrument, and H2-conditional MR / coloc
 mp <- rd("mapt", "cpgs.tsv")
