@@ -74,6 +74,7 @@ Pipeline in `scripts/R/` (run from the repo root with `conda activate pd-qtl`):
 | 8 | `08_inhouse_gwas.R` | in-house PD GWAS (PLINK2 logistic, European ancestry; sex, age, 5 PCs): PPMI 487 vs 182 (395 vs 182 without genetic-cohort cases), PEG 428 vs 217 |
 | 9 | `09_results_table.R` | consolidated table of primary hits: MR, sensitivity, crossed replication, coloc, evidence tier, and the required metadata (sample, timepoint, covariates, instrument strength, IV assumptions) |
 | 10 | `10_mapt.R` | (run before step 9) MAPT H1/H2: instrument LD with the H2 tag (rs8070723), H2-conditional mQTL (exact, in-sample) and GWAS (approximate, 1000G EUR LD), conditional MR and coloc |
+| 11 | `11_shared_instruments.R` | (run before step 9) groups hits whose instruments are the same SNP or in LD r² ≥ 0.8; co-methylation in controls, mQTL–mQTL coloc, independent-instrument count (MVMR feasibility), 450K gene annotation |
 
 Design choices:
 - **Exposure.** The primary exposure is the PEG1 + PPMI **controls** mQTL meta-analysis.
@@ -137,12 +138,32 @@ instrument that tags H2 instruments many CpGs (and genes) at once:
   vs −0.24 (SE 0.03) in Nalls. Both are compatible with Nalls given their size; the
   PPMI reversal is consistent with chance, not a data error.
 
+Shared instruments. CpGs whose instruments are the same SNP, or SNPs in strong LD,
+get Wald ratios that are one PD signal rescaled by each CpG's mQTL effect, so MR can't
+say which CpG (if any) matters:
+- The 44 primary hits form **22 instrument groups**: 16 single CpGs and 6 groups of
+  2–8 CpGs (28 CpGs in all). The group, not the CpG, is the unit of nomination.
+- Multivariable MR is not possible for any group: each has only 1–2 mutually
+  independent instruments (r² < 0.01) for 2–8 CpGs.
+- The groups look different:
+  - One group is 7 CpGs within 1 kb that share their mQTL causal variant (mQTL–mQTL
+    coloc H4 0.81–0.93) and are strongly co-methylated (residual r 0.58–0.98). It's one
+    regulatory unit. It accounts for 7 of the 11 tier B CpGs.
+  - One group is 3 CpGs spread over 116 kb. They share an mQTL variant (H4 0.94) but
+    are not co-methylated (r ≈ 0), so one variant acts on each CpG separately. One of the
+    three is tier A, the other two tier C. The tier A CpG can't be singled out from the
+    other two.
+  - The two groups at SNCA and TMEM175 share an mQTL variant within each group and are
+    tier C.
+  - The two MAPT groups are linked through H1/H2 LD (see above).
+- By group, the tiers are: A 5 groups (7 CpGs), B 5 groups (11), C 12 groups (26).
+
 These are **nominations, not causal claims**. Remaining Phase 1 work:
 - [x] Colocalization (coloc.abf, coloc-SuSiE).
 - [x] Crossed replication with in-house GWAS.
 - [x] Results table with sample, cohort, methylation timepoint, covariates, instrument
       strength and the IV assumptions relied on (`results/phase1/tables/`).
-- [ ] CpGs sharing one instrument: MR alone cannot tell which CpG, if any, is causal.
+- [x] CpGs sharing one instrument (`results/phase1/shared_iv/`, `tables/instrument_groups.tsv`).
 - [x] MAPT H1/H2 handling (`results/phase1/mapt/`).
 - [ ] Coloc-SuSiE for exposures other than PEG1 controls, and for the no-proxy GWAS.
 - [ ] Optional, not blocking: a larger PEG GWAS. PD status, sex and age are currently

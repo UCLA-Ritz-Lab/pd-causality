@@ -13,7 +13,7 @@
 
 source("scripts/R/phase1_lib.R")
 cfg <- load_config()
-rd <- function(...) { f <- out_path(cfg, ...); if (file.exists(f)) fread(f, colClasses = list(character = "cpg_chr")) else NULL }
+rd <- function(...) { f <- out_path(cfg, ...); if (file.exists(f)) suppressWarnings(fread(f, colClasses = list(character = "cpg_chr"))) else NULL }
 
 p <- rd("mr", "meta_controls__nalls2019.tsv.gz")[fdr < cfg$fdr]
 inst <- fread(out_path(cfg, "instruments", "meta_controls__nalls2019.tsv.gz"),
@@ -48,6 +48,11 @@ mp <- rd("mapt", "cpgs.tsv")
 if (!is.null(mp)) out <- merge(out, mp[, .(cpg_id, mapt_class, mapt_r2_h2 = round(r2_h2, 3), mapt_cond_mqtl_p = cond_lead_p,
                                            mapt_cond_mr_p = cond_mr_p, mapt_cond_gwas_p = cond_gwas_p,
                                            mapt_cond_abf_H4 = round(cond_abf_H4, 3))], by = "cpg_id", all.x = TRUE)
+
+# Shared instruments (step 11): CpGs in one group are one nomination, not separate ones
+sg <- rd("shared_iv", "cpgs.tsv")
+if (!is.null(sg)) out <- merge(out, sg[, .(cpg_id, iv_group = group_id, iv_group_size = group_size, iv_group_rank = rank_in_group,
+                                           gene, gene_feature, island)], by = "cpg_id", all.x = TRUE)
 
 # crossed replication: same direction as primary and p < 0.05 in any crossed analysis
 xcols <- grep("^b_x_", names(out), value = TRUE)
@@ -93,4 +98,9 @@ loci <- out[, .(chr = cpg_chr[1], start = min(cpg_pos), end = max(cpg_pos), n_cp
 setorder(loci, best_tier, best_p)
 fwrite(loci, out_path(cfg, "tables", "loci.tsv"), sep = "\t")
 print(out[, .N, by = tier][order(tier)])
+if ("iv_group" %in% names(out)) {
+  ig <- out[, .(n_cpg = .N, best_tier = min(tier)), by = iv_group]
+  fwrite(ig, out_path(cfg, "tables", "instrument_groups.tsv"), sep = "\t")
+  print(ig[, .(groups = .N, cpgs = sum(n_cpg)), by = best_tier][order(best_tier)])
+}
 print(loci)
