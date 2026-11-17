@@ -73,6 +73,7 @@ Pipeline in `scripts/R/` (run from the repo root with `conda activate pd-qtl`):
 | 7 | `07_coloc_susie.R` | coloc-SuSiE (several causal variants): PEG1-controls mQTL with in-sample LD, GWAS with 1000G EUR LD |
 | 8 | `08_inhouse_gwas.R` | in-house PD GWAS (PLINK2 logistic, European ancestry; sex, age, 5 PCs): PPMI 487 vs 182 (395 vs 182 without genetic-cohort cases), PEG 428 vs 217 |
 | 9 | `09_results_table.R` | consolidated table of primary hits: MR, sensitivity, crossed replication, coloc, evidence tier, and the required metadata (sample, timepoint, covariates, instrument strength, IV assumptions) |
+| 10 | `10_mapt.R` | (run before step 9) MAPT H1/H2: instrument LD with the H2 tag (rs8070723), H2-conditional mQTL (exact, in-sample) and GWAS (approximate, 1000G EUR LD), conditional MR and coloc |
 
 Design choices:
 - **Exposure.** The primary exposure is the PEG1 + PPMI **controls** mQTL meta-analysis.
@@ -119,16 +120,35 @@ fewer than 500 cases, so they test direction, not significance:
   is excluded. PPMI's GWAS shows essentially no MAPT effect (lead-SNP log-OR 0.006 vs
   0.24 in Nalls), which reverses the concordance when MAPT is included.
 
+MAPT H1/H2 (17q21.31). 12 of the 44 primary hits lie in the inversion region. The
+H2 tag SNP is itself a genome-wide cis-mQTL for 45 CpGs in PEG1 controls, so any
+instrument that tags H2 instruments many CpGs (and genes) at once:
+- 6 of the 12 CpGs have instruments in near-complete LD with H2 (r² 0.86–0.99), and no
+  mQTL is left once H2 is conditioned on. Their MR estimates are the H2 haplotype effect
+  on PD, rescaled per CpG, and can't be attributed to a CpG.
+- 2 more have instruments that partly tag H2 (r² 0.74). An H2-independent mQTL remains,
+  but it has no PD association after conditioning (coloc H3 ≥ 0.86).
+- The remaining 4 have instruments in weak LD with H2 (r² 0.10–0.14). Their MR signal
+  mostly disappears when the GWAS is conditioned on H2 (p 0.03–0.79). For 3 of them,
+  coloc on the conditional statistics favours distinct signals (H3 ≈ 1). The fourth has
+  no conditional mQTL at p < 5×10⁻⁸ left to test.
+- So no MAPT CpG has evidence independent of the H1/H2 haplotype. All 12 stay tier C.
+- In-house GWAS: the H2 log-OR is +0.12 (SE 0.21) in PPMI and −0.09 (SE 0.16) in PEG,
+  vs −0.24 (SE 0.03) in Nalls. Both are compatible with Nalls given their size; the
+  PPMI reversal is consistent with chance, not a data error.
+
 These are **nominations, not causal claims**. Remaining Phase 1 work:
 - [x] Colocalization (coloc.abf, coloc-SuSiE).
 - [x] Crossed replication with in-house GWAS.
 - [x] Results table with sample, cohort, methylation timepoint, covariates, instrument
       strength and the IV assumptions relied on (`results/phase1/tables/`).
 - [ ] CpGs sharing one instrument: MR alone cannot tell which CpG, if any, is causal.
-- [ ] MAPT H1/H2 handling (inversion; extended LD).
+- [x] MAPT H1/H2 handling (`results/phase1/mapt/`).
 - [ ] Coloc-SuSiE for exposures other than PEG1 controls, and for the no-proxy GWAS.
-- [ ] Larger PEG GWAS if a phenotype file for all ~1,840 genotyped PEG participants
-      becomes available (currently only the 760 methylation-study participants).
+- [ ] Optional, not blocking: a larger PEG GWAS. PD status, sex and age are currently
+      available only for the 807 methylation-study participants (760 with ancestry PCs,
+      645 European), not for all 1,840 genotyped. Data access was scoped to mQTL
+      analyses; the full phenotypes could be requested.
 
 ### Phase 2: semi-synthetic benchmark (planned)
 

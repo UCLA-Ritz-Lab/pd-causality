@@ -43,6 +43,12 @@ su <- rd("coloc_susie", "meta_controls__nalls2019.tsv.gz")[, .(cpg_id, susie_cs_
                                                               susie_H4 = round(best_H4, 3), susie_H3 = round(best_H3, 3), susie_call)]
 out <- merge(merge(out, ab, by = "cpg_id", all.x = TRUE), su, by = "cpg_id", all.x = TRUE)
 
+# MAPT H1/H2 (step 10): H2-tag LD of the instrument, and H2-conditional MR / coloc
+mp <- rd("mapt", "cpgs.tsv")
+if (!is.null(mp)) out <- merge(out, mp[, .(cpg_id, mapt_class, mapt_r2_h2 = round(r2_h2, 3), mapt_cond_mqtl_p = cond_lead_p,
+                                           mapt_cond_mr_p = cond_mr_p, mapt_cond_gwas_p = cond_gwas_p,
+                                           mapt_cond_abf_H4 = round(cond_abf_H4, 3))], by = "cpg_id", all.x = TRUE)
+
 # crossed replication: same direction as primary and p < 0.05 in any crossed analysis
 xcols <- grep("^b_x_", names(out), value = TRUE)
 out[, crossed_same_dir := rowSums(sapply(xcols, function(cn) sign(get(cn)) == sign(b)), na.rm = TRUE)]
@@ -60,6 +66,9 @@ out[, tier := fcase(
   susie_call == "moderate_H4", "B",
   susie_call %in% c("no_credible_set", "not_run") & abf_call == "moderate_H4", "B",
   default = "C")]
+# MAPT: no CpG-attributable estimate unless an H2-conditional signal colocalizes
+if ("mapt_class" %in% names(out))
+  out[!is.na(mapt_class) & (is.na(mapt_cond_abf_H4) | mapt_cond_abf_H4 < 0.8), tier := "C"]
 
 # metadata required on every result table
 out[, `:=`(
