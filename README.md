@@ -205,7 +205,7 @@ apply in the other.
 config/config.example.yaml   paths + thresholds (copy to config.yaml, git-ignored)
 scripts/R/                   Phase 1 MR pipeline (phase1_lib.R + numbered steps)
 scripts/py/                  PFN / CausalFM wrappers (Phase 0 smoke test)
-docs/                        toolkit capabilities, Phase 1 output spec (phase1_output_spec.md)
+docs/                        toolkit capabilities, Phase 1 flowchart (phase1_flowchart.md) and output spec (phase1_output_spec.md)
 data/                        symlinks to raw + PD-QTLs outputs (git-ignored)
 results/                     all outputs (git-ignored)
 ```
