@@ -2,8 +2,11 @@
 # Phase 1, step 8: in-house PD GWAS in PPMI and PEG for the crossed two-sample design
 # (PEG mQTL x PPMI GWAS, PPMI mQTL x PEG GWAS; never same-cohort pairs).
 #
-# PLINK2 logistic regression (Firth fallback) on imputed dosages (HRC r1.1, hg19),
+# PLINK2 Firth-penalised logistic regression for every variant on imputed dosages (HRC r1.1, hg19),
 # variants with MAF >= 0.01 (in the analysed sample) and imputation R2 >= 0.3.
+# Firth for all variants, not just as a fallback: plink2 falls back only when the ordinary
+# fit fails to converge, so quasi-separated rare variants (e.g. LRRK2 G2019S, carried almost
+# only by cases) came out with |log-OR| in the hundreds. Firth gives finite, shrunk estimates.
 # European-ancestry participants only (ANCESTRY_REF assigned_superpop == EUR), to match
 # Nalls and the mQTL instruments. Covariates: sex, age, ancestry PCs 1-5.
 #   ppmi       : PD (all 511 genotyped PD) vs healthy controls; prodromal + SWEDD excluded.
@@ -71,8 +74,8 @@ for (nm in names(runs)) {
   fwrite(d[, .(`#FID` = IID, IID, MALE, AGE, PC1, PC2, PC3, PC4, PC5)], file.path(odir, paste0(nm, ".covar")), sep = "\t")
   outp <- file.path(odir, nm)
   cmd <- sprintf(paste("%s --pfile %s --keep %s --pheno %s --pheno-name PD --covar %s --covar-variance-standardize",
-                       "--extract-if-info 'R2 >= 0.3' --maf 0.01 --glm firth-fallback hide-covar cols=+a1freq",
-                       "--threads 4 --memory 16000 --out %s > %s.plink.log 2>&1"),
+                       "--extract-if-info 'R2 >= 0.3' --maf 0.01 --glm firth hide-covar cols=+a1freq",
+                       "--threads 4 --memory 8000 --out %s > %s.plink.log 2>&1"),
                  cfg$clump$plink2, r$pfile, pf, pf, file.path(odir, paste0(nm, ".covar")), outp, outp)
   gpat <- paste0("^", nm, "\\.PD\\.glm\\.(logistic|logistic\\.hybrid|firth)$")
   if (!length(list.files(odir, pattern = gpat))) {        # reuse a finished plink2 run

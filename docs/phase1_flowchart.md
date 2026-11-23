@@ -171,9 +171,10 @@ flowchart TD
 ```
 
 Not shown because they don't change the tier: coloc-SuSiE with the no-proxy GWAS,
-crossed replication, the sensitivity exposures, and the probe-body SNP flag
-(step 12, `probe_snp_ld`). They are reported as columns
-next to the tier.
+crossed replication, the sensitivity exposures, the probe-body SNP flag
+(step 12, `probe_snp_ld`), and the fragile-coloc flag (`coloc_fragile`: a SuSiE tier
+A/B call resting on credible sets that barely overlap). They are reported as columns
+next to the tier, with `tier_basis` saying which coloc result set it.
 
 ## 5. MAPT H1/H2 classification (step 10)
 

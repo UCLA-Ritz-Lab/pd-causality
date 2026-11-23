@@ -40,7 +40,13 @@ out <- add_mr(out, "ppmi_controls__peg_gwas", "x_ppmimqtl_peggwas")
 
 ab <- rd("coloc", "meta_controls__nalls2019.tsv.gz")[, .(cpg_id, abf_H3 = round(PP.H3, 3), abf_H4 = round(PP.H4, 3), abf_call = coloc)]
 su <- rd("coloc_susie", "meta_controls__nalls2019.tsv.gz")[, .(cpg_id, susie_cs_mqtl = cs_mqtl, susie_cs_gwas = cs_gwas,
-                                                              susie_H4 = round(best_H4, 3), susie_H3 = round(best_H3, 3), susie_call)]
+                                                              susie_H4 = round(best_H4, 3), susie_H3 = round(best_H3, 3), susie_call,
+                                                              # best credible-set pair (step 7)
+                                                              susie_cs_mqtl_size = cs_mqtl_size, susie_cs_mqtl_span_kb = round(cs_mqtl_span_kb, 1),
+                                                              susie_cs_mqtl_purity = round(cs_mqtl_purity, 2),
+                                                              susie_cs_gwas_size = cs_gwas_size, susie_cs_gwas_span_kb = round(cs_gwas_span_kb, 1),
+                                                              susie_cs_gwas_purity = round(cs_gwas_purity, 2),
+                                                              susie_cs_overlap_snps = cs_overlap_snps, susie_pip_overlap_S = round(pip_overlap_S, 4))]
 out <- merge(merge(out, ab, by = "cpg_id", all.x = TRUE), su, by = "cpg_id", all.x = TRUE)
 # sensitivity (does not change the tier): coloc-SuSiE with the no-proxy GWAS on the same hits
 sn <- rd("coloc_susie", "meta_controls__nalls2019_noproxy_on_nalls2019.tsv.gz")
@@ -86,6 +92,29 @@ out[, tier := fcase(
 if ("mapt_class" %in% names(out))
   out[!is.na(mapt_class) & (is.na(mapt_cond_abf_H4) | mapt_cond_abf_H4 < 0.8), tier := "C"]
 
+# Which coloc result set the tier, and whether a tier A/B call from coloc-SuSiE is fragile.
+# coloc.susie's H4/(H3+H4) for a pair is roughly 500 S / (1 + 500 S), S = sum_j alpha1_j alpha2_j,
+# so H4 >= 0.8 needs only S ~ 0.01: two diffuse credible sets that barely touch can give it.
+# Flags (any one makes the call fragile; reasons listed in coloc_fragile_reason):
+#   no_shared_snp : the two 95% credible sets have no SNP in common
+#   low_overlap   : S < 0.05 (H4 would stay >= 0.8 with S as low as 0.008)
+#   diffuse_cs    : either credible set has > 10 SNPs or spans > 100 kb
+#   abf_disagrees : coloc.abf (controls meta, single-variant) favours distinct signals (H3 >= 0.5)
+# Not assessable (NA) where the tier came from coloc.abf (no SuSiE credible set for a trait).
+out[, tier_basis := fcase(!is.na(mapt_class), "mapt_conditional",
+                          susie_call %in% c("no_credible_set", "not_run") | is.na(susie_call), "coloc_abf",
+                          default = "coloc_susie")]
+out[, coloc_fragile_reason := NA_character_]
+out[tier %in% c("A", "B") & tier_basis == "coloc_susie", coloc_fragile_reason := {
+  r <- cbind(fifelse(susie_cs_overlap_snps == 0, "no_shared_snp", NA_character_),
+             fifelse(susie_pip_overlap_S < 0.05, "low_overlap", NA_character_),
+             fifelse(pmax(susie_cs_mqtl_size, susie_cs_gwas_size) > 10 |
+                       pmax(susie_cs_mqtl_span_kb, susie_cs_gwas_span_kb) > 100, "diffuse_cs", NA_character_),
+             fifelse(abf_H3 >= 0.5, "abf_disagrees", NA_character_))
+  apply(r, 1, function(x) paste(na.omit(x), collapse = ";"))
+}]
+out[, coloc_fragile := fifelse(is.na(coloc_fragile_reason), NA, nzchar(coloc_fragile_reason))]
+
 # metadata required on every result table
 out[, `:=`(
   exposure_sample = "PEG1 controls (n=231, 450K) + PPMI controls (n=69, EPIC v1); common-effect IVW meta of per-cohort cis-mQTLs",
@@ -98,6 +127,7 @@ out[, `:=`(
                          "independence: two-sample, ancestry-matched (EUR GWAS; mQTL adjusted for 5 PCs); small PPMI-in-Nalls overlap;",
                          "exclusion: single instrument for most CpGs, pleiotropy-robust MR not possible -> relies on coloc;",
                          "neighbouring CpGs sharing one instrument are not distinguishable;",
+                         "coloc: tier_basis says which coloc set the tier; coloc_fragile = SuSiE tier A/B resting on little credible-set overlap;",
                          "measurement: probe_snp_ld = instrument in LD (r2>=0.8) with a SNP in the probe body, so the mQTL may be partly a hybridisation artefact"))]
 setorder(out, tier, p)
 fwrite(out, out_path(cfg, "tables", "primary_hits.tsv"), sep = "\t")
@@ -110,9 +140,11 @@ loci <- out[, .(chr = cpg_chr[1], start = min(cpg_pos), end = max(cpg_pos), n_cp
 setorder(loci, best_tier, best_p)
 fwrite(loci, out_path(cfg, "tables", "loci.tsv"), sep = "\t")
 print(out[, .N, by = tier][order(tier)])
+print(out[tier %in% c("A", "B"), .N, by = .(tier, tier_basis, coloc_fragile, coloc_fragile_reason)][order(tier, tier_basis)])
 if ("iv_group" %in% names(out)) {
   ig <- out[, .(n_cpg = .N, best_tier = min(tier),
-                probe_snp_ld_cpgs = if ("probe_snp_ld" %in% names(out)) sum(probe_snp_ld, na.rm = TRUE) else NA_integer_), by = iv_group]
+                probe_snp_ld_cpgs = if ("probe_snp_ld" %in% names(out)) sum(probe_snp_ld, na.rm = TRUE) else NA_integer_,
+                coloc_fragile_cpgs = sum(coloc_fragile, na.rm = TRUE)), by = iv_group]
   fwrite(ig, out_path(cfg, "tables", "instrument_groups.tsv"), sep = "\t")
   print(ig[, .(groups = .N, cpgs = sum(n_cpg)), by = best_tier][order(best_tier)])
 }

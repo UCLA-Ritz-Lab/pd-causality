@@ -230,6 +230,10 @@ Files: `meta_controls__nalls2019` (primary), `meta_controls__nalls2019_noproxy` 
 | `s_lambda_mqtl`, `s_lambda_gwas` | `estimate_s_rss` z-vs-LD consistency; near 0 is consistent, larger values indicate LD mismatch. |
 | `best_H4`, `best_H3` | coloc.susie posteriors for the credible-set pair with the highest H4. |
 | `hit_mqtl`, `hit_gwas` | Top SNPs of that pair's credible sets. |
+| `cs_mqtl_size`, `cs_mqtl_span_kb`, `cs_mqtl_purity` | That pair's mQTL 95% credible set: SNPs, span, purity (minimum absolute LD r between its SNPs). |
+| `cs_gwas_size`, `cs_gwas_span_kb`, `cs_gwas_purity` | Same for the GWAS credible set. |
+| `cs_overlap_snps` | SNPs in both credible sets. |
+| `pip_overlap_S` | Σ_j α_mQTL,j · α_GWAS,j over SNPs for the two SuSiE effects: the probability both signals sit on the same SNP. The pair's H4/(H3+H4) ≈ 500·S/(1+500·S) (500 = p12/(p1·p2)), so H4 ≥ 0.8 needs only S ≈ 0.008. |
 | `abf_H3`, `abf_H4`, `abf_call` | coloc.abf result from step 6 for the same outcome (NA if the CpG was not a hit for that outcome). |
 | `susie_call` | `strong_H4` / `moderate_H4` / `distinct_H3` / `inconclusive`; `no_credible_set` (a trait had no credible set, so coloc.susie can't test it); `not_run`. |
 
@@ -239,15 +243,16 @@ Files: `meta_controls__nalls2019` (primary), `meta_controls__nalls2019_noproxy` 
 | `nsnps` | SNPs. |
 | `hit1`, `hit2` | Top SNP of the mQTL (1) and GWAS (2) credible set. |
 | `PP.H0.abf` … `PP.H4.abf` | coloc posteriors for this pair. |
-| `idx1`, `idx2` | Credible-set indices. |
+| `idx1`, `idx2` | SuSiE effect indices (rows of `alpha`) of the two credible sets. |
 | `cpg_id` | CpG. |
+| `cs_*`, `pip_overlap_S` | As in the per-CpG file, for this pair. |
 
 ---
 
 ## Step 8 — `08_inhouse_gwas.R` → `inhouse_gwas/`
 
 ### `inhouse_gwas/{ppmi,ppmi_nogen,peg}.tsv.gz` — in-house PD GWAS (Nalls format)
-PLINK2 logistic (Firth fallback), European ancestry, covariates sex, age, PC1–5; imputation R² ≥ 0.3, MAF ≥ 0.01.
+PLINK2 Firth-penalised logistic for every variant (an ordinary fit with Firth only as fallback left quasi-separated rare variants with |log-OR| in the hundreds), European ancestry, covariates sex, age, PC1–5; imputation R² ≥ 0.3, MAF ≥ 0.01.
 
 | Column | Description |
 |---|---|
@@ -294,6 +299,7 @@ PLINK2 logistic (Firth fallback), European ancestry, covariates sex, age, PC1–
 |---|---|
 | `abf_H3`, `abf_H4`, `abf_call` | coloc.abf (step 6). |
 | `susie_cs_mqtl`, `susie_cs_gwas`, `susie_H4`, `susie_H3`, `susie_call` | coloc-SuSiE, primary GWAS (step 7). |
+| `susie_cs_mqtl_size`, `susie_cs_mqtl_span_kb`, `susie_cs_mqtl_purity`, `susie_cs_gwas_size`, `susie_cs_gwas_span_kb`, `susie_cs_gwas_purity`, `susie_cs_overlap_snps`, `susie_pip_overlap_S` | Credible-set diagnostics of the best SuSiE pair (step 7). |
 | `susie_noproxy_cs_gwas`, `susie_noproxy_H4`, `susie_noproxy_H3`, `susie_noproxy_call` | coloc-SuSiE with the no-proxy GWAS (sensitivity; does not affect the tier). |
 
 **MAPT (step 10; NA/empty outside the MAPT region)**
@@ -328,6 +334,8 @@ PLINK2 logistic (Firth fallback), European ancestry, covariates sex, age, PC1–
 | Column | Description |
 |---|---|
 | `tier` | **A**: SuSiE H4 ≥ 0.8, or abf H4 ≥ 0.8 where SuSiE had no credible set. **B**: moderate (H4 0.5–0.8), same rule. **C**: everything else (distinct signals or no support). MAPT CpGs are C unless an H2-conditional coloc has H4 ≥ 0.8. |
+| `tier_basis` | Which result set the tier: `coloc_susie`, `coloc_abf` (a trait had no SuSiE credible set) or `mapt_conditional`. |
+| `coloc_fragile`, `coloc_fragile_reason` | For tier A/B CpGs whose tier came from coloc-SuSiE: TRUE if any of `no_shared_snp` (credible sets share no SNP), `low_overlap` (S < 0.05), `diffuse_cs` (a credible set has > 10 SNPs or spans > 100 kb), `abf_disagrees` (coloc.abf H3 ≥ 0.5). NA otherwise (not assessable for abf-based tiers). Does not change the tier. |
 | `exposure_sample`, `methylation_timepoint`, `mqtl_covariates`, `outcome_sample`, `estimand`, `instrument_rule`, `iv_assumptions` | Text, same in every row: the sample, timepoint, covariates, effect scale, instrument rule and the IV assumptions relied on (required by CLAUDE.md on every result table). |
 
 ### `tables/loci.tsv` — primary hits grouped into loci
@@ -350,6 +358,7 @@ A new locus starts when the next CpG (sorted by position) is on another chromoso
 | `n_cpg` | Primary hits in the group. |
 | `best_tier` | Best tier among them. |
 | `probe_snp_ld_cpgs` | CpGs in the group with `probe_snp_ld` (step 12). |
+| `coloc_fragile_cpgs` | CpGs in the group with `coloc_fragile`. |
 
 ---
 

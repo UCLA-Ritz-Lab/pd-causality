@@ -71,7 +71,7 @@ Pipeline in `scripts/R/` (run from the repo root with `conda activate pd-qtl`):
 | 5 | `05_regional_mqtl.R` | refits **untruncated** regional cis-mQTL statistics (±1 Mb) for the MR hits, for colocalization. Same model as PD-QTLs; reproduces its output to machine precision |
 | 6 | `06_coloc.R` | coloc.abf (single causal variant) per hit CpG; p12 = 5×10⁻⁶ (1×10⁻⁵ as sensitivity) |
 | 7 | `07_coloc_susie.R` | coloc-SuSiE (several causal variants): PEG1-controls mQTL with in-sample LD, GWAS with 1000G EUR LD; `07_coloc_susie.R nalls2019_noproxy nalls2019` runs the no-proxy GWAS on the primary hits |
-| 8 | `08_inhouse_gwas.R` | in-house PD GWAS (PLINK2 logistic, European ancestry; sex, age, 5 PCs): PPMI 487 vs 182 (395 vs 182 without genetic-cohort cases), PEG 428 vs 217 |
+| 8 | `08_inhouse_gwas.R` | in-house PD GWAS (PLINK2 Firth logistic, European ancestry; sex, age, 5 PCs): PPMI 487 vs 182 (395 vs 182 without genetic-cohort cases), PEG 428 vs 217 |
 | 9 | `09_results_table.R` | consolidated table of primary hits: MR, sensitivity, crossed replication, coloc, evidence tier, and the required metadata (sample, timepoint, covariates, instrument strength, IV assumptions) |
 | 10 | `10_mapt.R` | (run before step 9) MAPT H1/H2: instrument LD with the H2 tag (rs8070723), H2-conditional mQTL (exact, in-sample) and GWAS (approximate, 1000G EUR LD), conditional MR and coloc |
 | 11 | `11_shared_instruments.R` | (run before step 9) groups hits whose instruments are the same SNP or in LD r² ≥ 0.8; co-methylation in controls, mQTL–mQTL coloc, independent-instrument count (MVMR feasibility), 450K gene annotation |
@@ -112,7 +112,20 @@ separate signals in LD, so each hit is tiered by coloc:
 - The largest known PD loci among the hits (including MAPT and SNCA) fall in tier C,
   even with multi-signal SuSiE.
 - Several tier A/B loci rest on sub-genome-wide PD signals, where SuSiE finds no
-  GWAS credible set. They depend on coloc.abf and need replication.
+  GWAS credible set. They depend on coloc.abf and need replication (12 of the 16 tier
+  A/B CpGs; `tier_basis` in `primary_hits.tsv`).
+- Fragile SuSiE calls. coloc.susie's H4 for a credible-set pair is roughly
+  500·S/(1 + 500·S), where S is the probability that both signals sit on the same SNP,
+  so H4 ≥ 0.8 needs only S ≈ 0.01. Step 7 now reports each pair's credible-set size, span,
+  purity and S, and step 9 flags tier A/B SuSiE calls as `coloc_fragile` when the sets
+  share no SNP, S < 0.05, a set is diffuse (> 10 SNPs or > 100 kb), or coloc.abf favours
+  distinct signals. 3 of the 4 SuSiE-based tier A/B CpGs are flagged:
+  - the 16p11.2 tier A and tier B calls: S of 0.018 and 0.007, a diffuse mQTL credible set
+    (PEG1 controls only), and coloc.abf on the controls meta favours distinct signals;
+  - one tier B call where both credible sets cover the same ~130 kb LD block (S = 0.006),
+    so the shared variant can't be localised.
+  Only one tier A call has compact, overlapping credible sets (S = 0.135). The flag
+  doesn't change the tier.
 - Sensitivity, coloc-SuSiE with the no-proxy GWAS (GCST009324) on the same 44 hits.
   The tiers are not changed by it:
   - Where the primary run found a shared variant, the no-proxy run agrees: both tier A
@@ -138,10 +151,14 @@ flag. The tier isn't changed. No probe-body SNP sits at the CpG or at the Type I
 extension base, the positions most likely to distort the beta-value.
 
 Crossed replication with in-house GWAS (independent of Nalls). The in-house GWAS have
-fewer than 500 cases, so they test direction, not significance:
-- **PPMI mQTL × PEG GWAS:** 92% of CpGs with Nalls-based MR p < 1e-5 have the same
-  direction (cor(z) = 0.78).
-- **PEG mQTL × PPMI GWAS:** 77–83% same direction (cor(z) ≈ 0.7) once the MAPT region
+fewer than 500 cases, so they test direction, not significance. They use Firth
+logistic regression for every variant, since an ordinary fit gave quasi-separated rare
+variants (e.g. LRRK2 G2019S in PPMI) absurd log-ORs; the common-SNP instruments are
+unaffected: no tier or nominal replication changed, and only 3 estimates near zero
+(p > 0.97) switched sign:
+- **PPMI mQTL × PEG GWAS:** 96% of CpGs with Nalls-based MR p < 1e-5 (25 of 26) have
+  the same direction (cor(z) = 0.78); 92% excluding MAPT.
+- **PEG mQTL × PPMI GWAS:** 77–81% same direction (cor(z) ≈ 0.7) once the MAPT region
   is excluded. PPMI's GWAS shows essentially no MAPT effect (lead-SNP log-OR 0.006 vs
   0.24 in Nalls), which reverses the concordance when MAPT is included.
 

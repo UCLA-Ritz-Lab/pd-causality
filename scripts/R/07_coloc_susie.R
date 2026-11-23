@@ -22,7 +22,8 @@
 #
 # Targets: CpGs with FDR < cfg$fdr in results/phase1/mr/meta_controls__nalls2019.tsv.gz.
 # Output: results/phase1/coloc_susie/meta_controls__{outcome}.tsv.gz (one row per CpG, best
-#         credible-set pair) and *_pairs.tsv.gz (all credible-set pairs).
+#         credible-set pair) and *_pairs.tsv.gz (all credible-set pairs), each with the
+#         pair's credible-set size / span / purity and PIP overlap S (see cs_diag below).
 #         With a second argument (another outcome), the CpGs tested are that outcome's MR hits
 #         and the output is meta_controls__{outcome}_on_{hits_from}*.tsv.gz, e.g. the
 #         no-proxy GWAS run on the primary hit set.
@@ -107,6 +108,26 @@ for (ch in unique(reg$chr)) {
 }
 logmsg("1000G EUR dosages loaded for %s SNPs", format(sum(vapply(eur, nrow, 0L)), big.mark = ","))
 
+# Credible-set diagnostics for one coloc.susie pair (idx = SuSiE effect index l, as in
+# coloc.susie's summary). S = sum_j alpha1[l1, j] * alpha2[l2, j] is the chance that both
+# signals sit on the same SNP; the pair's H4/(H3+H4) is roughly 500 S / (1 + 500 S)
+# (500 = p12 / (p1 p2)), so a high H4 can come from a small overlap of two diffuse sets.
+cs_diag <- function(s, l) {
+  j <- match(l, s$sets$cs_index)
+  v <- names(s$pip)[s$sets$cs[[j]]]
+  pos <- as.integer(sub(".*:", "", v))
+  list(snps = v, size = length(v), span_kb = (max(pos) - min(pos)) / 1e3,
+       purity = s$sets$purity[j, "min.abs.corr"])
+}
+pair_diag <- function(s1, s2, l1, l2) {
+  a <- cs_diag(s1, l1); b <- cs_diag(s2, l2)
+  common <- intersect(colnames(s1$alpha), colnames(s2$alpha))
+  data.table(cs_mqtl_size = a$size, cs_mqtl_span_kb = a$span_kb, cs_mqtl_purity = a$purity,
+             cs_gwas_size = b$size, cs_gwas_span_kb = b$span_kb, cs_gwas_purity = b$purity,
+             cs_overlap_snps = length(intersect(a$snps, b$snps)),
+             pip_overlap_S = sum(s1$alpha[l1, common] * s2$alpha[l2, common]))
+}
+
 ld_from <- function(M) { R <- suppressWarnings(cor(M)); R[is.na(R)] <- 0; dimnames(R) <- list(colnames(M), colnames(M)); R }
 gp_poly <- colnames(Gp)[apply(Gp, 2, sd) > 1e-8]
 
@@ -140,15 +161,21 @@ for (cp in cpgs) {
   ncs2 <- if (is.null(s2)) NA_integer_ else length(s2$sets$cs)
   row <- data.table(cpg_id = cp, nsnps = nrow(d), cs_mqtl = ncs1, cs_gwas = ncs2,
                     s_lambda_mqtl = lam1, s_lambda_gwas = lam2,
-                    best_H4 = NA_real_, best_H3 = NA_real_, hit_mqtl = NA_character_, hit_gwas = NA_character_)
+                    best_H4 = NA_real_, best_H3 = NA_real_, hit_mqtl = NA_character_, hit_gwas = NA_character_,
+                    cs_mqtl_size = NA_integer_, cs_mqtl_span_kb = NA_real_, cs_mqtl_purity = NA_real_,
+                    cs_gwas_size = NA_integer_, cs_gwas_span_kb = NA_real_, cs_gwas_purity = NA_real_,
+                    cs_overlap_snps = NA_integer_, pip_overlap_S = NA_real_)
   if (isTRUE(ncs1 > 0) && isTRUE(ncs2 > 0)) {
     cs <- suppressWarnings(suppressMessages(coloc.susie(s1, s2, p1 = 1e-4, p2 = 1e-4, p12 = 5e-6)))
     sm <- as.data.table(cs$summary)
     if (nrow(sm)) {
       sm[, cpg_id := cp]
+      sm <- cbind(sm, rbindlist(lapply(seq_len(nrow(sm)), function(i) pair_diag(s1, s2, sm$idx1[i], sm$idx2[i]))))
       pairs_out[[cp]] <- sm
       b <- sm[which.max(PP.H4.abf)]
       row[, `:=`(best_H4 = b$PP.H4.abf, best_H3 = b$PP.H3.abf, hit_mqtl = b$hit1, hit_gwas = b$hit2)]
+      dcols <- names(pair_diag(s1, s2, b$idx1, b$idx2))
+      row[, (dcols) := b[, dcols, with = FALSE]]
     }
   }
   res[[cp]] <- row
