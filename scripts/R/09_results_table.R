@@ -59,6 +59,12 @@ sg <- rd("shared_iv", "cpgs.tsv")
 if (!is.null(sg)) out <- merge(out, sg[, .(cpg_id, iv_group = group_id, iv_group_size = group_size, iv_group_rank = rank_in_group,
                                            gene, gene_feature, island)], by = "cpg_id", all.x = TRUE)
 
+# Probe-body SNPs (step 12): reported next to the tier, does not change it
+ps <- rd("probe_snps", "cpgs.tsv")
+if (!is.null(ps)) out <- merge(out, ps[, .(cpg_id, probe_type, n_probe_snps, probe_snps,
+                                           probe_snp_max_r2_iv = round(probe_snp_max_r2_iv, 3),
+                                           probe_snp_is_regional_lead, probe_snp_ld)], by = "cpg_id", all.x = TRUE)
+
 # crossed replication: same direction as primary and p < 0.05 in any crossed analysis
 xcols <- grep("^b_x_", names(out), value = TRUE)
 out[, crossed_same_dir := rowSums(sapply(xcols, function(cn) sign(get(cn)) == sign(b)), na.rm = TRUE)]
@@ -91,7 +97,8 @@ out[, `:=`(
   iv_assumptions = paste("relevance: F reported;",
                          "independence: two-sample, ancestry-matched (EUR GWAS; mQTL adjusted for 5 PCs); small PPMI-in-Nalls overlap;",
                          "exclusion: single instrument for most CpGs, pleiotropy-robust MR not possible -> relies on coloc;",
-                         "neighbouring CpGs sharing one instrument are not distinguishable"))]
+                         "neighbouring CpGs sharing one instrument are not distinguishable;",
+                         "measurement: probe_snp_ld = instrument in LD (r2>=0.8) with a SNP in the probe body, so the mQTL may be partly a hybridisation artefact"))]
 setorder(out, tier, p)
 fwrite(out, out_path(cfg, "tables", "primary_hits.tsv"), sep = "\t")
 
@@ -104,7 +111,8 @@ setorder(loci, best_tier, best_p)
 fwrite(loci, out_path(cfg, "tables", "loci.tsv"), sep = "\t")
 print(out[, .N, by = tier][order(tier)])
 if ("iv_group" %in% names(out)) {
-  ig <- out[, .(n_cpg = .N, best_tier = min(tier)), by = iv_group]
+  ig <- out[, .(n_cpg = .N, best_tier = min(tier),
+                probe_snp_ld_cpgs = if ("probe_snp_ld" %in% names(out)) sum(probe_snp_ld, na.rm = TRUE) else NA_integer_), by = iv_group]
   fwrite(ig, out_path(cfg, "tables", "instrument_groups.tsv"), sep = "\t")
   print(ig[, .(groups = .N, cpgs = sum(n_cpg)), by = best_tier][order(best_tier)])
 }

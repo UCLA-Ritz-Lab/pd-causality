@@ -262,7 +262,7 @@ PLINK2 logistic (Firth fallback), European ancestry, covariates sex, age, PC1–
 
 ---
 
-## Step 9 — `09_results_table.R` → `tables/` (run after steps 10 and 11)
+## Step 9 — `09_results_table.R` → `tables/` (run after steps 10, 11 and 12)
 
 ### `tables/primary_hits.tsv` — one row per primary hit (meta_controls × nalls2019, FDR < 0.05)
 
@@ -313,6 +313,16 @@ PLINK2 logistic (Firth fallback), European ancestry, covariates sex, age, PC1–
 | `iv_group`, `iv_group_size`, `iv_group_rank` | Instrument group, its size, and this CpG's rank in it (reporting order only). |
 | `gene`, `gene_feature`, `island` | 450K manifest annotation (see step 11). |
 
+**Probe-body SNPs (step 12; reported, does not change the tier)**
+
+| Column | Description |
+|---|---|
+| `probe_type` | Infinium I or II. |
+| `n_probe_snps`, `probe_snps` | SNPs inside the 50-mer probe body. |
+| `probe_snp_max_r2_iv` | Highest EUR r² between a probe-body SNP and an instrument of the CpG. |
+| `probe_snp_is_regional_lead` | TRUE if a probe-body SNP is the strongest regional mQTL SNP. |
+| `probe_snp_ld` | TRUE if `probe_snp_max_r2_iv` ≥ 0.8: the mQTL may be partly a hybridisation artefact. |
+
 **Tier and required metadata**
 
 | Column | Description |
@@ -339,6 +349,7 @@ A new locus starts when the next CpG (sorted by position) is on another chromoso
 | `iv_group` | Instrument group (step 11). |
 | `n_cpg` | Primary hits in the group. |
 | `best_tier` | Best tier among them. |
+| `probe_snp_ld_cpgs` | CpGs in the group with `probe_snp_ld` (step 12). |
 
 ---
 
@@ -419,3 +430,34 @@ Groups primary hits whose lead instruments are the same SNP or in LD r² ≥ 0.8
 | `same_iv` | TRUE if both have the identical lead instrument. |
 | `cor_peg1`, `cor_ppmi` | Covariate-adjusted methylation correlation in each controls cohort. |
 | `mqtl_H3`, `mqtl_H4` | mQTL–mQTL coloc.abf (controls meta): distinct vs shared mQTL causal variant. |
+
+---
+
+## Step 12 — `12_probe_snps.R` → `probe_snps/` (run before step 9)
+
+Primary hits only. Each 450K/EPIC 50-mer (minfi manifest `ProbeSeqA`) is matched to the bisulfite-converted hg19 reference around its CpG (both strands, ≤ 3 mismatches, exactly one match required). Candidate SNPs are those in the step 5 regional files or in 1000G EUR. LD with the instruments uses 1000G EUR.
+
+### `probe_snps/cpgs.tsv` — one row per primary hit
+| Column | Description |
+|---|---|
+| `cpg_id` | CpG. |
+| `array` | Manifest used (450K, or EPIC for EPIC-only probes). |
+| `probe_type` | Infinium I or II. |
+| `probe_start`, `probe_end` | Probe body on hg19. |
+| `sbe_pos` | Type I single-base-extension position (NA for Type II, whose extension base is the CpG itself). |
+| `n_probe_snps`, `probe_snps` | SNPs inside the probe body. |
+| `probe_snp_positions` | Where they sit: `body`, `CpG`, or `SBE` (the last two distort the beta-value most). |
+| `probe_snp_max_r2_iv` | Highest EUR r² between a probe-body SNP and an instrument. |
+| `probe_snp_min_mqtl_p` | Strongest regional mQTL p of a probe-body SNP (primary-exposure cohorts). |
+| `probe_snp_is_regional_lead` | A probe-body SNP is the strongest regional mQTL SNP. |
+| `probe_snp_ld` | `probe_snp_max_r2_iv` ≥ 0.8. |
+
+### `probe_snps/snps.tsv` — one row per CpG × probe-body SNP
+| Column | Description |
+|---|---|
+| `cpg_id`, `snp_id` | Pair. |
+| `dist_bp`, `position`, `probe_type` | Distance to the CpG, position class, probe type. |
+| `max_r2_iv`, `iv_best` | Highest r² with an instrument, and which instrument. |
+| `in_1000g` | SNP is in the 1000G EUR reference (r² is NA otherwise). |
+| `mqtl_p_min` | Strongest regional mQTL p (primary-exposure cohorts). |
+| `is_regional_lead` | The SNP is the regional mQTL lead. |

@@ -30,6 +30,7 @@ flowchart TD
     X["Crossed replication<br/>PEG mQTL × PPMI GWAS<br/>PPMI mQTL × PEG GWAS"]
     S10["Step 10: MAPT H1/H2<br/>conditional analyses"]
     S11["Step 11: shared instruments<br/>group CpGs by instrument LD"]
+    S12["Step 12: probe-body SNPs<br/>flag instruments in LD<br/>with a SNP in the probe"]
     S9["Step 9: results table<br/>evidence tier A / B / C"]
     OUT(["Nominations<br/>44 CpGs in 22 instrument groups<br/>tier A: 5 groups, B: 5, C: 12"])
 
@@ -43,12 +44,14 @@ flowchart TD
     S5 --> S10 --> S9
     REF --> S10
     S5 --> S11 --> S9
+    S5 --> S12 --> S9
+    REF --> S12
     REF --> S11
     S9 --> OUT
 ```
 
 Mandatory run order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 (steps 1–4 again for the
-crossed pairings) → 10 → 11 → 9.
+crossed pairings) → 10 → 11 → 12 → 9.
 
 ## 2. Building instruments (steps 1–3)
 
@@ -168,7 +171,8 @@ flowchart TD
 ```
 
 Not shown because they don't change the tier: coloc-SuSiE with the no-proxy GWAS,
-crossed replication, and the sensitivity exposures. They are reported as columns
+crossed replication, the sensitivity exposures, and the probe-body SNP flag
+(step 12, `probe_snp_ld`). They are reported as columns
 next to the tier.
 
 ## 5. MAPT H1/H2 classification (step 10)

@@ -75,6 +75,7 @@ Pipeline in `scripts/R/` (run from the repo root with `conda activate pd-qtl`):
 | 9 | `09_results_table.R` | consolidated table of primary hits: MR, sensitivity, crossed replication, coloc, evidence tier, and the required metadata (sample, timepoint, covariates, instrument strength, IV assumptions) |
 | 10 | `10_mapt.R` | (run before step 9) MAPT H1/H2: instrument LD with the H2 tag (rs8070723), H2-conditional mQTL (exact, in-sample) and GWAS (approximate, 1000G EUR LD), conditional MR and coloc |
 | 11 | `11_shared_instruments.R` | (run before step 9) groups hits whose instruments are the same SNP or in LD r² ≥ 0.8; co-methylation in controls, mQTL–mQTL coloc, independent-instrument count (MVMR feasibility), 450K gene annotation |
+| 12 | `12_probe_snps.R` | (run before step 9) maps each hit's 50-mer probe onto hg19 and lists SNPs inside the probe body; flags hits whose instrument is in LD (r² ≥ 0.8, 1000G EUR) with a probe-body SNP, where the mQTL may be partly a hybridisation artefact |
 
 Design choices:
 - **Exposure.** The primary exposure is the PEG1 + PPMI **controls** mQTL meta-analysis.
@@ -126,6 +127,15 @@ separate signals in LD, so each hit is tiered by coloc:
     nomination.
   - The tier A/B CpGs that rely on coloc.abf still have no GWAS credible set, as
     expected with fewer cases.
+
+Probe-body SNPs (step 12). Instruments are always more than 50 bp from the CpG, so
+none lies in a probe, but an instrument can be in LD with a SNP that does. 11 of the 44
+hits have a SNP inside the probe body, and for 7 it is in LD (r² ≥ 0.8) with the
+instrument: 2 tier A CpGs, 1 tier B and 4 tier C. For one tier A CpG the in-probe SNP is
+the regional mQTL lead. The array data can't separate a hybridisation artefact from a
+real methylation effect on the same haplotype, so these hits carry a `probe_snp_ld`
+flag. The tier isn't changed. No probe-body SNP sits at the CpG or at the Type I
+extension base, the positions most likely to distort the beta-value.
 
 Crossed replication with in-house GWAS (independent of Nalls). The in-house GWAS have
 fewer than 500 cases, so they test direction, not significance:

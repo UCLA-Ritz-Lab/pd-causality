@@ -86,3 +86,7 @@ clump:
   plink2: plink2
 
 fdr: 0.05
+
+# ── Probe-body SNP check (step 12) ──────────────────────────────────────────
+probe_check:
+  fasta: data/raw/PPMI_WGS/resources/hg19.fa   # hg19 reference with .fai index
